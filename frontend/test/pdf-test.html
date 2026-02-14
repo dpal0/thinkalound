@@ -1,150 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume Interview Test</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Interview Test</title>
 </head>
 <body>
-    <div class="container">
-        <!-- Resume Upload -->
-        <div class="upload-section">
-            <h2>Resume Upload</h2>
-            <input type="file" id="fileInput" accept=".pdf">
-            <button onclick="document.getElementById('fileInput').click()">Choose PDF</button>
-            <div id="status"></div>
-        </div>
-
-        <!-- Chat -->
-        <div class="chat-section">
-            <h2>Chat</h2>
-            <div id="messages"></div>
-            <div class="input-area">
-                <input type="text" id="chatInput" placeholder="Type message...">
-                <button id="sendBtn">Send</button>
-            </div>
-        </div>
-
-        <!-- Voice (Future) -->
-        <div class="voice-section">
-            <h2>Voice</h2>
-            <p>Coming later...</p>
-        </div>
+  <div class="container">
+    <!-- Resume Upload -->
+    <div class="upload-section">
+      <h2>Resume Upload</h2>
+      <input type="file" id="fileInput" accept=".pdf" />
+      <button id="choosePdfBtn">Choose PDF</button>
+      <div id="status"></div>
     </div>
 
-    <script>
-        const API_URL = 'http://localhost:8000';
-        let conversationId = null;
-        let chatStarted = false;
+    <!-- Chat -->
+    <div class="chat-section">
+      <h2>Chat</h2>
+      <div id="messages"></div>
+      <div class="input-area">
+        <input type="text" id="chatInput" placeholder="Type message..." />
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
 
-        const fileInput = document.getElementById('fileInput');
-        const status = document.getElementById('status');
-        const messages = document.getElementById('messages');
-        const chatInput = document.getElementById('chatInput');
-        const sendBtn = document.getElementById('sendBtn');
+    <!-- Voice -->
+    <div class="voice-section">
+      <audio id="ttsAudio" controls style="width: 100%; margin-top: 12px;"></audio>
+      <h2>Voice</h2>
+      <p>Coming later...</p>
+    </div>
+  </div>
 
-        fileInput.addEventListener('change', handleFile);
-        sendBtn.addEventListener('click', sendMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        async function handleFile() {
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            status.textContent = 'Uploading...';
-            
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const response = await fetch(`${API_URL}/upload-pdf`, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    conversationId = result.conversation_id;
-                    status.textContent = 'Upload successful!';
-                    startChat();
-                } else {
-                    status.textContent = 'Upload failed';
-                }
-            } catch (error) {
-                status.textContent = 'Upload error';
-                console.error(error);
-            }
-        }
-
-        async function startChat() {
-            try {
-                const response = await fetch(`${API_URL}/start-chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ conversation_id: conversationId })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    chatStarted = true;
-                    addMessage(result.question, 'ai');
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
-
-        async function sendMessage() {
-            const message = chatInput.value.trim();
-            if (!message) return;
-
-            if (!chatStarted) {
-                addMessage('Please upload a resume first', 'ai');
-                return;
-            }
-
-            addMessage(message, 'user');
-            chatInput.value = '';
-
-            try {
-                const response = await fetch(`${API_URL}/send-message`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        conversation_id: conversationId,
-                        message: message
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    if (result.ai_response) {
-                        addMessage(result.ai_response, 'ai');
-                    }
-                    if (result.next_question) {
-                        setTimeout(() => {
-                            addMessage(result.next_question, 'ai');
-                        }, 1000);
-                    }
-                }
-            } catch (error) {
-                addMessage('Error sending message', 'ai');
-                console.error(error);
-            }
-        }
-
-        function addMessage(text, type) {
-            const div = document.createElement('div');
-            div.className = `message ${type}`;
-            div.textContent = text;
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
-        }
-    </script>
+  <!-- Your JS file -->
+  <script src="./app.js"></script>
 </body>
 </html>

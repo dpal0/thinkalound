@@ -1,178 +1,60 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
 import PyPDF2
 import io
+import os
 import random
 from datetime import datetime
-from typing import List, Dict
-
+from typing import List, Dict, Optional, AsyncGenerator
+from dotenv import load_dotenv
+from elevenlabs.client import ElevenLabs
+from elevenlabs.play import play
+import httpx
+load_dotenv()
 app = FastAPI()
 
-# Enable CORS for frontend
+# ----------------------------
+# CORS (dev: allow all)
+# ----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # dev only; lock down in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# In-memory storage for conversations (use database in production)
-conversations = {}
+# ----------------------------
+# In-memory storage (dev only)
+# ----------------------------
+conversations: Dict[str, Dict] = {}
 
-# Pydantic models for request/response
+# ----------------------------
+# Pydantic models
+# ----------------------------
 class ChatMessage(BaseModel):
     conversation_id: str
     message: str
 
-@app.get("/")
-async def root():
-    return {"message": "PDF Upload API is running!"}
-
-@app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    """
-    Upload and extract text from PDF
-    """
-    print(f"Received file: {file.filename}")
-    
-    # Check if it's a PDF
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    
-    try:
-        # Read the file content
-        content = await file.read()
-        print(f"File size: {len(content)} bytes")
-        
-        # Extract text from PDF
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-        print(f"Number of pages: {len(pdf_reader.pages)}")
-        
-        # Extract text from all pages
-        extracted_text = ""
-        for page_num, page in enumerate(pdf_reader.pages):
-            page_text = page.extract_text()
-            extracted_text += page_text + "\n"
-            print(f"Page {page_num + 1}: {len(page_text)} characters")
-        
-        if not extracted_text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract text from PDF. The PDF might be image-based or corrupted.")
-        
-        print(f"Total extracted text: {len(extracted_text)} characters")
-        
-        # Generate conversation ID and store the resume
-        conversation_id = f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
-        conversations[conversation_id] = {
-            "resume_text": extracted_text,
-            "messages": [],
-            "created_at": datetime.now().isoformat()
-        }
-        
-        return {
-            "success": True,
-            "message": "PDF processed successfully!",
-            "filename": file.filename,
-            "text_length": len(extracted_text),
-            "text_preview": extracted_text[:500],  # First 500 characters
-            "conversation_id": conversation_id
-        }
-        
-    except Exception as e:
-        print(f"Error processing PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
-
-
 class StartChatRequest(BaseModel):
     conversation_id: str
 
-@app.post("/start-chat")
-async def start_chat(request: StartChatRequest):
-    """Start conversation with first question"""
-    if request.conversation_id not in conversations:
-        raise HTTPException(status_code=400, detail="Conversation not found")
-    
-    # Generate first question based on resume
-    resume_text = conversations[request.conversation_id]["resume_text"]
-    first_question = generate_question(resume_text, conversations[request.conversation_id]["messages"])
-    
-    # Add first question to conversation
-    conversations[request.conversation_id]["messages"].append({
-        "type": "ai_question",
-        "content": first_question,
-        "timestamp": datetime.now().isoformat()
-    })
-    
-    return {
-        "success": True,
-        "question": first_question,
-        "conversation_id": request.conversation_id
-    }
+class TTSRequest(BaseModel):
+    text: str
+    model_id: Optional[str] = "eleven_multilingual_v2"
 
-@app.post("/send-message")
-async def send_message(chat_data: ChatMessage):
-    """
-    Handle user message and generate response
-    """
-    if chat_data.conversation_id not in conversations:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    conversation = conversations[chat_data.conversation_id]
-    
-    # Add user message
-    conversation["messages"].append({
-        "type": "user_response",
-        "content": chat_data.message,
-        "timestamp": datetime.now().isoformat()
-    })
-    
-    # Generate AI response
-    ai_response = generate_response(chat_data.message)
-    conversation["messages"].append({
-        "type": "ai_response", 
-        "content": ai_response,
-        "timestamp": datetime.now().isoformat()
-    })
-    
-    # Generate next question
-    next_question = generate_question(conversation["resume_text"], conversation["messages"])
-    if next_question:
-        conversation["messages"].append({
-            "type": "ai_question",
-            "content": next_question, 
-            "timestamp": datetime.now().isoformat()
-        })
-    
-    return {
-        "success": True,
-        "ai_response": ai_response,
-        "next_question": next_question,
-        "conversation_id": chat_data.conversation_id
-    }
 
-@app.get("/conversation/{conversation_id}")
-async def get_conversation(conversation_id: str):
-    """
-    Get full conversation history
-    """
-    if conversation_id not in conversations:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    return {
-        "success": True,
-        "conversation": conversations[conversation_id]
-    }
-
+# ----------------------------
+# Helpers
+# ----------------------------
 def generate_question(resume_text: str, conversation_history: List[Dict]) -> str:
-    """
-    Generate interview questions - you can make this smarter with AI later
-    """
-    # Basic question bank
     questions = [
         "Tell me about your most recent work experience and key accomplishments.",
         "What programming languages or technologies are you most comfortable with?",
-        "Describe a challenging project you worked on and how you overcame obstacles.", 
+        "Describe a challenging project you worked on and how you overcame obstacles.",
         "What interests you most about this type of role?",
         "How do you stay updated with new technologies in your field?",
         "Tell me about a time you had to learn something completely new for a project.",
@@ -184,45 +66,212 @@ def generate_question(resume_text: str, conversation_history: List[Dict]) -> str
         "What motivates you in your work?",
         "How do you handle tight deadlines and pressure?",
         "Describe a time you disagreed with a team member. How did you handle it?",
-        "What's the most innovative solution you've implemented?"
+        "What's the most innovative solution you've implemented?",
     ]
-    
-    # Get already asked questions
-    asked_questions = [msg["content"] for msg in conversation_history if msg["type"] == "ai_question"]
-    
-    # Filter available questions
+
+    asked_questions = [
+        msg["content"]
+        for msg in conversation_history
+        if msg.get("type") == "ai_question" and "content" in msg
+    ]
+
     available_questions = [q for q in questions if q not in asked_questions]
-    
     if not available_questions:
         return "Thank you for sharing! Do you have any questions about the role or our company?"
-    
-    # Return a random available question
+
     return random.choice(available_questions)
 
+
 def generate_response(user_message: str) -> str:
-    """
-    Generate AI response to user's answer - you can make this smarter with AI later
-    """
     responses = [
         "That's great! Thanks for sharing that insight.",
         "Interesting! I can see how that experience would be valuable.",
-        "Thanks for elaborating on that. That's really helpful context.", 
+        "Thanks for elaborating on that. That's really helpful context.",
         "I appreciate you walking me through that experience.",
         "That sounds like valuable experience. Thanks for the details.",
         "Great example! That shows strong problem-solving skills.",
         "That's impressive! It's clear you have solid experience in this area.",
         "Thanks for the detailed response. That gives me good insight into your background.",
         "Excellent! That demonstrates good technical knowledge.",
-        "I can tell you've put thought into your career development."
+        "I can tell you've put thought into your career development.",
     ]
-    
     return random.choice(responses)
+
+
+def get_elevenlabs_config() -> tuple[str, str]:
+    """
+    Read env vars safely and return (api_key, voice_id).
+    Raise a clean HTTP 500 if missing.
+    """
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    elevenlabs = ElevenLabs(
+        api_key= api_key,
+    )
+    print(f"api_key: {api_key}")
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID")
+    print(f"voice id: {voice_id}")
+    if not api_key or not voice_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Missing ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID in environment.",
+        )
+    return api_key, voice_id
+
+
+# ----------------------------
+# Routes
+# ----------------------------
+@app.get("/")
+async def root():
+    return {"message": "PDF Upload API is running!"}
+
+
+@app.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Upload and extract text from PDF.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
+
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+
+        extracted_text_parts: List[str] = []
+        for page in pdf_reader.pages:
+            page_text = page.extract_text() or ""  # extract_text() can return None
+            extracted_text_parts.append(page_text)
+
+        extracted_text = "\n".join(extracted_text_parts).strip()
+
+        if not extracted_text:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not extract text from PDF (it may be scanned/image-based).",
+            )
+
+        conversation_id = f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
+        conversations[conversation_id] = {
+            "resume_text": extracted_text,
+            "messages": [],
+            "created_at": datetime.now().isoformat(),
+        }
+
+        return {
+            "success": True,
+            "message": "PDF processed successfully!",
+            "filename": file.filename,
+            "text_length": len(extracted_text),
+            "text_preview": extracted_text[:500],
+            "conversation_id": conversation_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+@app.post("/start-chat")
+async def start_chat(request: StartChatRequest):
+    if request.conversation_id not in conversations:
+        raise HTTPException(status_code=400, detail="Conversation not found")
+
+    convo = conversations[request.conversation_id]
+    first_question = generate_question(convo["resume_text"], convo["messages"])
+
+    convo["messages"].append(
+        {"type": "ai_question", "content": first_question, "timestamp": datetime.now().isoformat()}
+    )
+
+    return {"success": True, "question": first_question, "conversation_id": request.conversation_id}
+
+
+@app.post("/send-message")
+async def send_message(chat_data: ChatMessage):
+    if chat_data.conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    convo = conversations[chat_data.conversation_id]
+
+    convo["messages"].append(
+        {"type": "user_response", "content": chat_data.message, "timestamp": datetime.now().isoformat()}
+    )
+
+    ai_response = generate_response(chat_data.message)
+    convo["messages"].append(
+        {"type": "ai_response", "content": ai_response, "timestamp": datetime.now().isoformat()}
+    )
+
+    next_question = generate_question(convo["resume_text"], convo["messages"])
+    if next_question:
+        convo["messages"].append(
+            {"type": "ai_question", "content": next_question, "timestamp": datetime.now().isoformat()}
+        )
+
+    return {
+        "success": True,
+        "ai_response": ai_response,
+        "next_question": next_question,
+        "conversation_id": chat_data.conversation_id,
+    }
+
+
+@app.get("/conversation/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    if conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"success": True, "conversation": conversations[conversation_id]}
+
+
+@app.post("/api/tts")
+async def tts(req: TTSRequest):
+    """
+    ElevenLabs TTS proxy. Returns audio/mpeg so the browser can play it.
+    """
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+
+    api_key, voice_id = get_elevenlabs_config()
+    tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
+
+    headers = {
+        "xi-api-key": api_key,
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+    }
+    payload = {"text": text, "model_id": req.model_id}
+
+    async def audio_stream() -> AsyncGenerator[bytes, None]:
+        timeout = httpx.Timeout(connect=10.0, read=60.0, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("POST", tts_url, headers=headers, json=payload) as r:
+                if r.status_code != 200:
+                    err = await r.aread()
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"ElevenLabs TTS error {r.status_code}: {err[:300].decode(errors='ignore')}",
+                    )
+                async for chunk in r.aiter_bytes():
+                    if chunk:
+                        yield chunk
+
+    return StreamingResponse(audio_stream(), media_type="audio/mpeg")
+
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "message": "PDF Upload service is running"}
+    return {"status": "healthy", "message": "Service is running"}
+
 
 if __name__ == "__main__":
-    import uvicorn
-    print("Starting PDF Upload API server...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+     import uvicorn
+     result = get_elevenlabs_config()
+     print(result)
+     print("Starting PDF Upload API server...")
+     uvicorn.run(app, host="0.0.0.0", port=8000)
