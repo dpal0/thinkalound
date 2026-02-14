@@ -1,138 +1,228 @@
-import os
-import json
-import asyncio
-import base64
-from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import websockets
-import httpx
-
-load_dotenv()
-
-ELEVENLABS_API_KEY = os.environ["ELEVENLABS_API_KEY"]
-ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "")
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import PyPDF2
+import io
+import random
+from datetime import datetime
+from typing import List, Dict
 
 app = FastAPI()
 
-# ----- Config -----
-# ElevenLabs realtime STT websocket (per docs)
-ELEVEN_STT_WS_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
-# ElevenLabs TTS streaming REST endpoint (per docs)
-ELEVEN_TTS_STREAM_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}/stream"
+# Enable CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-HEADERS = {
-    "xi-api-key": ELEVENLABS_API_KEY,
-}
+# In-memory storage for conversations (use database in production)
+conversations = {}
 
-@app.websocket("/ws/voice")
-async def ws_voice(ws: WebSocket):
-    await ws.accept()
+# Pydantic models for request/response
+class ChatMessage(BaseModel):
+    conversation_id: str
+    message: str
 
-    # Connect to ElevenLabs realtime STT
-    # You may need to pass query params depending on your audio format.
-    # We'll use 16kHz mono PCM16 from browser via AudioWorklet (recommended).
+@app.get("/")
+async def root():
+    return {"message": "PDF Upload API is running!"}
+
+@app.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Upload and extract text from PDF
+    """
+    print(f"Received file: {file.filename}")
+    
+    # Check if it's a PDF
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
     try:
-        async with websockets.connect(
-            ELEVEN_STT_WS_URL,
-            extra_headers=HEADERS,
-            ping_interval=20,
-            ping_timeout=20,
-        ) as stt_ws:
-
-            # Send an initial config message if required by ElevenLabs STT
-            # Some providers require this; if ElevenLabs expects it, add it here.
-            # We'll keep it minimal and adapt once you see the first error payload.
-            await stt_ws.send(json.dumps({
-                "type": "start",
-                "audio_format": {
-                    "type": "pcm_s16le",
-                    "sample_rate": 16000,
-                    "channels": 1
-                }
-            }))
-
-            async def forward_audio():
-                """Client -> Eleven STT"""
-                while True:
-                    msg = await ws.receive_text()
-                    data = json.loads(msg)
-
-                    if data["type"] == "audio":
-                        # audio is base64 PCM16 chunk
-                        await stt_ws.send(json.dumps({
-                            "type": "audio",
-                            "audio": data["audio"]
-                        }))
-                    elif data["type"] == "stop":
-                        await stt_ws.send(json.dumps({"type": "stop"}))
-                        break
-
-            async def read_transcripts_and_respond():
-                """Eleven STT -> client transcript; and trigger TTS on final transcript."""
-                buffer_text = ""
-                while True:
-                    raw = await stt_ws.recv()
-                    event = json.loads(raw)
-
-                    # You will inspect actual event schema once you run it.
-                    # We'll handle common shapes: partial + final.
-                    if event.get("type") in ("partial_transcript", "transcript"):
-                        text = event.get("text", "")
-                        is_final = event.get("is_final", False)
-
-                        # Stream transcript to frontend
-                        await ws.send_text(json.dumps({
-                            "type": "transcript",
-                            "text": text,
-                            "is_final": is_final
-                        }))
-
-                        if is_final and text.strip():
-                            # For hackathon MVP: simple echo response
-                            reply = f"Got it. You said: {text.strip()}"
-                            await ws.send_text(json.dumps({"type": "llm_text", "text": reply}))
-
-                            # Stream TTS audio back
-                            async for chunk_b64 in stream_tts_b64(reply):
-                                await ws.send_text(json.dumps({
-                                    "type": "tts_audio",
-                                    "audio": chunk_b64
-                                }))
-
-                            await ws.send_text(json.dumps({"type": "tts_done"}))
-
-                    elif event.get("type") == "end":
-                        break
-
-            async def stream_tts_b64(text: str):
-                """Calls ElevenLabs TTS streaming endpoint and yields base64 audio chunks."""
-                if not ELEVENLABS_VOICE_ID:
-                    # If no voice id, just skip
-                    return
-
-                payload = {
-                    "text": text,
-                    # model_id optional; you can set a low-latency model if your account supports it
-                    # "model_id": "eleven_flash_v2",
-                    "voice_settings": {"stability": 0.4, "similarity_boost": 0.8}
-                }
-
-                async with httpx.AsyncClient(timeout=None) as client:
-                    with client.stream("POST", ELEVEN_TTS_STREAM_URL, headers=HEADERS, json=payload) as r:
-                        r.raise_for_status()
-                        async for chunk in r.aiter_bytes():
-                            if not chunk:
-                                continue
-                            yield base64.b64encode(chunk).decode("utf-8")
-
-            await asyncio.gather(forward_audio(), read_transcripts_and_respond())
-
-    except WebSocketDisconnect:
-        return
+        # Read the file content
+        content = await file.read()
+        print(f"File size: {len(content)} bytes")
+        
+        # Extract text from PDF
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+        print(f"Number of pages: {len(pdf_reader.pages)}")
+        
+        # Extract text from all pages
+        extracted_text = ""
+        for page_num, page in enumerate(pdf_reader.pages):
+            page_text = page.extract_text()
+            extracted_text += page_text + "\n"
+            print(f"Page {page_num + 1}: {len(page_text)} characters")
+        
+        if not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from PDF. The PDF might be image-based or corrupted.")
+        
+        print(f"Total extracted text: {len(extracted_text)} characters")
+        
+        # Generate conversation ID and store the resume
+        conversation_id = f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
+        conversations[conversation_id] = {
+            "resume_text": extracted_text,
+            "messages": [],
+            "created_at": datetime.now().isoformat()
+        }
+        
+        return {
+            "success": True,
+            "message": "PDF processed successfully!",
+            "filename": file.filename,
+            "text_length": len(extracted_text),
+            "text_preview": extracted_text[:500],  # First 500 characters
+            "conversation_id": conversation_id
+        }
+        
     except Exception as e:
-        # send error to frontend for debugging
-        try:
-            await ws.send_text(json.dumps({"type": "error", "message": str(e)}))
-        except:
-            pass
-        return
+        print(f"Error processing PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+class StartChatRequest(BaseModel):
+    conversation_id: str
+
+@app.post("/start-chat")
+async def start_chat(request: StartChatRequest):
+    """Start conversation with first question"""
+    if request.conversation_id not in conversations:
+        raise HTTPException(status_code=400, detail="Conversation not found")
+    
+    # Generate first question based on resume
+    resume_text = conversations[request.conversation_id]["resume_text"]
+    first_question = generate_question(resume_text, conversations[request.conversation_id]["messages"])
+    
+    # Add first question to conversation
+    conversations[request.conversation_id]["messages"].append({
+        "type": "ai_question",
+        "content": first_question,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    return {
+        "success": True,
+        "question": first_question,
+        "conversation_id": request.conversation_id
+    }
+
+@app.post("/send-message")
+async def send_message(chat_data: ChatMessage):
+    """
+    Handle user message and generate response
+    """
+    if chat_data.conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    conversation = conversations[chat_data.conversation_id]
+    
+    # Add user message
+    conversation["messages"].append({
+        "type": "user_response",
+        "content": chat_data.message,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    # Generate AI response
+    ai_response = generate_response(chat_data.message)
+    conversation["messages"].append({
+        "type": "ai_response", 
+        "content": ai_response,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    # Generate next question
+    next_question = generate_question(conversation["resume_text"], conversation["messages"])
+    if next_question:
+        conversation["messages"].append({
+            "type": "ai_question",
+            "content": next_question, 
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    return {
+        "success": True,
+        "ai_response": ai_response,
+        "next_question": next_question,
+        "conversation_id": chat_data.conversation_id
+    }
+
+@app.get("/conversation/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """
+    Get full conversation history
+    """
+    if conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {
+        "success": True,
+        "conversation": conversations[conversation_id]
+    }
+
+def generate_question(resume_text: str, conversation_history: List[Dict]) -> str:
+    """
+    Generate interview questions - you can make this smarter with AI later
+    """
+    # Basic question bank
+    questions = [
+        "Tell me about your most recent work experience and key accomplishments.",
+        "What programming languages or technologies are you most comfortable with?",
+        "Describe a challenging project you worked on and how you overcame obstacles.", 
+        "What interests you most about this type of role?",
+        "How do you stay updated with new technologies in your field?",
+        "Tell me about a time you had to learn something completely new for a project.",
+        "What are your career goals for the next few years?",
+        "Describe your experience working in a team environment.",
+        "What's a project you're particularly proud of?",
+        "How do you approach problem-solving when faced with technical challenges?",
+        "Tell me about your leadership experience.",
+        "What motivates you in your work?",
+        "How do you handle tight deadlines and pressure?",
+        "Describe a time you disagreed with a team member. How did you handle it?",
+        "What's the most innovative solution you've implemented?"
+    ]
+    
+    # Get already asked questions
+    asked_questions = [msg["content"] for msg in conversation_history if msg["type"] == "ai_question"]
+    
+    # Filter available questions
+    available_questions = [q for q in questions if q not in asked_questions]
+    
+    if not available_questions:
+        return "Thank you for sharing! Do you have any questions about the role or our company?"
+    
+    # Return a random available question
+    return random.choice(available_questions)
+
+def generate_response(user_message: str) -> str:
+    """
+    Generate AI response to user's answer - you can make this smarter with AI later
+    """
+    responses = [
+        "That's great! Thanks for sharing that insight.",
+        "Interesting! I can see how that experience would be valuable.",
+        "Thanks for elaborating on that. That's really helpful context.", 
+        "I appreciate you walking me through that experience.",
+        "That sounds like valuable experience. Thanks for the details.",
+        "Great example! That shows strong problem-solving skills.",
+        "That's impressive! It's clear you have solid experience in this area.",
+        "Thanks for the detailed response. That gives me good insight into your background.",
+        "Excellent! That demonstrates good technical knowledge.",
+        "I can tell you've put thought into your career development."
+    ]
+    
+    return random.choice(responses)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "message": "PDF Upload service is running"}
+
+if __name__ == "__main__":
+    import uvicorn
+    print("Starting PDF Upload API server...")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
