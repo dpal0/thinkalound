@@ -1,19 +1,22 @@
 // App.tsx
 import { useState } from 'react'
 import './App.css'
+import AIInterviewer from './AIInterviewer'
 
 const experts = [
-  { id: 1, name: 'Project Manager AI' },
-  { id: 2, name: 'ML Researcher AI' },
-  { id: 3, name: 'Finance Advisor AI' },
-  { id: 4, name: 'Health Coach AI' },
+    { id: 1, name: 'AI Interviewer' },
+    { id: 2, name: 'AI Mode 2' },
+
 ]
 
 function App() {
   const [selectedExpert, setSelectedExpert] = useState(experts[0])
   const [voiceMode, setVoiceMode] = useState(false)
-  const [wordLimit, setWordLimit] = useState(200)
-  const [timeLimit, setTimeLimit] = useState(60)
+
+  // Limits will come from agent question later
+  const [limitType, setLimitType] = useState<'word' | 'time' | 'none'>('word')
+  const [limitValue, setLimitValue] = useState(200)
+
   const [sessionSummary, setSessionSummary] = useState('')
   const [feedback, setFeedback] = useState('')
   const [fileName, setFileName] = useState('')
@@ -40,78 +43,7 @@ function App() {
         </aside>
 
         <section className="chat">
-          <div className="chat-header">
-            <h2>{selectedExpert.name}</h2>
-            <div className="session-buttons">
-              <button>Resume Session</button>
-              <button onClick={() => setSessionSummary('')}>New Session</button>
-            </div>
-          </div>
-
-          <div className="chat-window">
-            <p className="placeholder">Conversation with AI will appear here...</p>
-          </div>
-
-          <div className="controls">
-            <div className="toggle-card">
-              <span>Voice Mode</span>
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={voiceMode}
-                  onChange={() => setVoiceMode(!voiceMode)}
-                />
-                <span className="slider" />
-              </label>
-            </div>
-
-            <div className="limit-card">
-              {!voiceMode ? (
-                <>
-                  <label>Word Limit</label>
-                  <input
-                    type="number"
-                    value={wordLimit}
-                    onChange={(e) => setWordLimit(Number(e.target.value))}
-                  />
-                </>
-              ) : (
-                <>
-                  <label>Time Limit (sec)</label>
-                  <input
-                    type="number"
-                    value={timeLimit}
-                    onChange={(e) => setTimeLimit(Number(e.target.value))}
-                  />
-                </>
-              )}
-            </div>
-
-            <div className="file-card">
-              <label>Upload File</label>
-              <input
-                type="file"
-                onChange={(e) => setFileName(e.target.files?.[0]?.name || '')}
-              />
-              <span className="file-name">{fileName}</span>
-            </div>
-          </div>
-
-          <div className="summary">
-            <h3>Session Summary</h3>
-            <textarea
-              placeholder="AI-generated summary will appear here..."
-              value={sessionSummary}
-              onChange={(e) => setSessionSummary(e.target.value)}
-            />
-
-            <h3>User Feedback for Future Sessions</h3>
-            <textarea
-              placeholder="Notes for the agent to remember next time..."
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-            />
-          </div>
+            {selectedExpert.name === 'AI Interviewer' && <AIInterviewer />}
         </section>
       </div>
     </div>

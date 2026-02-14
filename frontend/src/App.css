@@ -1,20 +1,37 @@
-/* App.css */
+/* ========================= */
+/* GLOBAL RESET */
+/* ========================= */
 
-body {
+* {
+    box-sizing: border-box;
+  }
+  
+  html, body, #root {
     margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
     font-family: Inter, system-ui, Arial, sans-serif;
     background: #0f172a;
     color: white;
   }
   
+  /* ========================= */
+  /* APP LAYOUT */
+  /* ========================= */
+  
   .app {
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
   }
   
+  /* HEADER FULL WIDTH */
+  
   .header {
+    width: 100%;
     background: #020617;
-    padding: 18px;
+    padding: 18px 0;
     border-bottom: 1px solid #1e293b;
     text-align: center;
   }
@@ -25,153 +42,73 @@ body {
   }
   
   .header p {
-    margin-top: 4px;
+    margin-top: 6px;
     color: #cbd5f5;
+    font-size: 15px;
   }
+  
+  /* ========================= */
+  /* MAIN GRID */
+  /* ========================= */
   
   .main {
     display: grid;
-    grid-template-columns: 20% 1fr;
+    grid-template-columns: 240px 1fr;
     flex: 1;
+    width: 100%;
   }
+  
+  /* SIDEBAR */
   
   .sidebar {
     background: #020617;
-    padding: 16px;
+    padding: 18px 14px;
     border-right: 1px solid #1e293b;
   }
   
   .sidebar h2 {
     color: #93c5fd;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    font-size: 18px;
   }
   
   .expert-btn {
     width: 100%;
     padding: 10px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     background: #111827;
     border: 1px solid #1e293b;
     border-radius: 8px;
     color: white;
     cursor: pointer;
     text-align: left;
+    transition: 0.2s;
+  }
+  
+  .expert-btn:hover {
+    background: #1e293b;
   }
   
   .expert-btn.active {
     background: #1d4ed8;
+    border-color: #3b82f6;
   }
+  
+  /* ========================= */
+  /* CHAT AREA */
+  /* ========================= */
   
   .chat {
+    padding: 24px;
     display: flex;
-    flex-direction: column;
-    padding: 20px;
-  }
-  
-  .chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #1e293b;
-    padding-bottom: 10px;
-  }
-  
-  .session-buttons button {
-    margin-left: 8px;
-    padding: 6px 12px;
-    background: #1d4ed8;
-    border: none;
-    border-radius: 6px;
-    color: white;
-    cursor: pointer;
-  }
-  
-  .chat-window {
-    flex: 1;
-    margin: 15px 0;
-    background: #020617;
-    border-radius: 12px;
-    padding: 15px;
-    overflow-y: auto;
-  }
-  
-  .controls {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    min-height: 80px;
-  }
-  
-  .toggle-card,
-  .limit-card,
-  .file-card {
-    background: #020617;
-    border: 1px solid #1e293b;
-    border-radius: 10px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 140px;
-  }
-  
-  .limit-card input,
-  .file-card input {
-    padding: 4px;
-    border-radius: 6px;
-    border: none;
-  }
-  
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 40px;
-    height: 22px;
-  }
-  
-  .switch input { display: none; }
-  
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #1e293b;
-    border-radius: 22px;
-  }
-  
-  .slider:before {
-    position: absolute;
-    content: '';
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
-    background: white;
-    border-radius: 50%;
-    transition: .3s;
-  }
-  
-  .switch input:checked + .slider {
-    background: #3b82f6;
-  }
-  
-  .switch input:checked + .slider:before {
-    transform: translateX(18px);
-  }
-  
-  .summary textarea {
+    justify-content: center;
     width: 100%;
-    height: 80px;
-    margin-bottom: 12px;
-    border-radius: 8px;
-    padding: 10px;
-    border: none;
-    background: #020617;
-    color: white;
   }
   
-  .file-name {
-    font-size: 12px;
-    color: #93c5fd;
+  /* Keeps conversation centered inside 80% area */
+  
+  .chat-inner {
+    width: 100%;
+    max-width: 1100px;
   }
   
