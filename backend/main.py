@@ -10,9 +10,15 @@ import random
 from datetime import datetime
 from typing import List, Dict, Optional, AsyncGenerator
 from dotenv import load_dotenv
-from elevenlabs.client import ElevenLabs
+from elevenlabs.client import ElevenLabs # type: ignore
 from elevenlabs.play import play
 import httpx
+
+from fastapi import WebSocket, WebSocketDisconnect
+import websockets
+import json
+import base64
+
 load_dotenv()
 app = FastAPI()
 
@@ -102,6 +108,7 @@ def get_elevenlabs_config() -> tuple[str, str]:
     """
     Read env vars safely and return (api_key, voice_id).
     Raise a clean HTTP 500 if missing.
+    make sure to load env at begining
     """
     api_key = os.getenv("ELEVENLABS_API_KEY")
     elevenlabs = ElevenLabs(
@@ -262,6 +269,87 @@ async def tts(req: TTSRequest):
                         yield chunk
 
     return StreamingResponse(audio_stream(), media_type="audio/mpeg")
+
+from fastapi import WebSocket, WebSocketDisconnect
+import asyncio
+import json
+import base64
+import websockets
+
+@app.websocket("/ws/stt")
+async def ws_stt(ws: WebSocket):
+    await ws.accept()
+
+    api_key, _ = get_elevenlabs_config()
+
+    eleven_url = (
+        "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+        "?model_id=scribe_v2_realtime"
+        "&audio_format=pcm_16000"
+        "&commit_strategy=vad"
+        "&language_code=en"
+        "&include_timestamps=false"
+    )
+
+    # websockets expects dict OR list[tuple], varies by version
+    header_dict = {"xi-api-key": api_key}
+    header_list = [("xi-api-key", api_key)]
+
+    try:
+        # ---- Connect to ElevenLabs with version-compatible headers ----
+        try:
+            # websockets >= 12 often uses additional_headers
+            el_ws = await websockets.connect(eleven_url, additional_headers=header_dict)
+        except TypeError:
+            try:
+                # some versions use extra_headers
+                el_ws = await websockets.connect(eleven_url, extra_headers=header_list)
+            except TypeError:
+                # older versions may accept "headers"
+                el_ws = await websockets.connect(eleven_url, headers=header_list)
+
+        async with el_ws:
+
+            async def forward_audio():
+                while True:
+                    data = await ws.receive_bytes()
+                    b64 = base64.b64encode(data).decode("ascii")
+                    print("got bytes:", len(data))
+                    msg = {
+                        "message_type": "input_audio_chunk",
+                        "audio_base_64": b64,
+                        "sample_rate": 16000,
+                    }
+                    await el_ws.send(json.dumps(msg))
+
+            async def forward_transcripts():
+                async for message in el_ws:
+                    try:
+                        payload = json.loads(message)
+                    except Exception:
+                        continue
+
+                    mt = payload.get("message_type")
+                    if mt in (
+                        "partial_transcript",
+                        "committed_transcript",
+                        "committed_transcript_with_timestamps",
+                        "session_started",
+                    ):
+                        await ws.send_json(payload)
+                    elif mt and "error" in mt or "error" in payload:
+                        await ws.send_json(payload)
+
+            await asyncio.gather(forward_audio(), forward_transcripts())
+
+    except WebSocketDisconnect:
+        return
+    except Exception as e:
+        # send back full error so you see it in browser console
+        try:
+            await ws.send_json({"message_type": "server_error", "detail": repr(e)})
+        except Exception:
+            pass
 
 
 @app.get("/health")

@@ -28,11 +28,19 @@
     <!-- Voice -->
     <div class="voice-section">
       <audio id="ttsAudio" controls style="width: 100%; margin-top: 12px;"></audio>
-      <h2>Voice</h2>
-      <p>Coming later...</p>
-    </div>
-  </div>
 
+      <!-- mic playback -->
+      <audio id="micPlayback" controls style="width: 100%; margin-top: 12px;"></audio>
+
+      <div id="recordStatus" style="margin-top: 8px;"></div>
+      <div id="liveTranscript" style="margin-top: 10px; font-family: monospace;"></div>
+      <button id="startRecBtn">Start Recording</button>
+      <button id="stopRecBtn" disabled>Stop</button>
+      
+
+    </div>
+
+  </div>
   <!-- Your JS file -->
   <script src="./app.js"></script>
 </body>
