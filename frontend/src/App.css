@@ -1,42 +1,114 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* ========================= */
+/* GLOBAL RESET */
+/* ========================= */
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+* {
+    box-sizing: border-box;
   }
-  to {
-    transform: rotate(360deg);
+  
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    font-family: Inter, system-ui, Arial, sans-serif;
+    background: #0f172a;
+    color: white;
   }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  
+  /* ========================= */
+  /* APP LAYOUT */
+  /* ========================= */
+  
+  .app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
   }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
+  
+  /* HEADER FULL WIDTH */
+  
+  .header {
+    width: 100%;
+    background: #020617;
+    padding: 18px 0;
+    border-bottom: 1px solid #1e293b;
+    text-align: center;
+  }
+  
+  .header h1 {
+    margin: 0;
+    color: #60a5fa;
+  }
+  
+  .header p {
+    margin-top: 6px;
+    color: #cbd5f5;
+    font-size: 15px;
+  }
+  
+  /* ========================= */
+  /* MAIN GRID */
+  /* ========================= */
+  
+  .main {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    flex: 1;
+    width: 100%;
+  }
+  
+  /* SIDEBAR */
+  
+  .sidebar {
+    background: #020617;
+    padding: 18px 14px;
+    border-right: 1px solid #1e293b;
+  }
+  
+  .sidebar h2 {
+    color: #93c5fd;
+    margin-bottom: 14px;
+    font-size: 18px;
+  }
+  
+  .expert-btn {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    text-align: left;
+    transition: 0.2s;
+  }
+  
+  .expert-btn:hover {
+    background: #1e293b;
+  }
+  
+  .expert-btn.active {
+    background: #1d4ed8;
+    border-color: #3b82f6;
+  }
+  
+  /* ========================= */
+  /* CHAT AREA */
+  /* ========================= */
+  
+  .chat {
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  
+  /* Keeps conversation centered inside 80% area */
+  
+  .chat-inner {
+    width: 100%;
+    max-width: 1100px;
+  }
+  

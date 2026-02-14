@@ -1,34 +1,43 @@
+// App.tsx
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import AIInterviewer from './AIInterviewer'
+
+const experts = [
+    { id: 1, name: 'AI Interviewer' },
+    { id: 2, name: 'AI Mode 2' },
+
+]
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [selectedExpert, setSelectedExpert] = useState(experts[0])
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="app">
+      <header className="header">
+        <h1>ThinkAloud</h1>
+        <p>Your multi‑expert AI workspace for deep thinking, planning, and collaboration.</p>
+      </header>
+
+      <div className="main">
+        <aside className="sidebar">
+          <h2>AI Experts</h2>
+          {experts.map((expert) => (
+            <button
+              key={expert.id}
+              className={`expert-btn ${selectedExpert.id === expert.id ? 'active' : ''}`}
+              onClick={() => setSelectedExpert(expert)}
+            >
+              {expert.name}
+            </button>
+          ))}
+        </aside>
+
+        <section className="chat">
+            {selectedExpert.name === 'AI Interviewer' && <AIInterviewer />}
+        </section>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </div>
   )
 }
 

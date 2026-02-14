@@ -1,0 +1,294 @@
+/* ========================= */
+/* CHAT HEADER */
+/* ========================= */
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 12px;
+  }
+  
+  .chat-header h2 {
+    margin: 0;
+    color: #93c5fd;
+  }
+  
+  /* SESSION BUTTONS */
+  
+  .session-buttons button {
+    margin-left: 10px;
+    padding: 7px 14px;
+    background: #1d4ed8;
+    border: none;
+    border-radius: 7px;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+  }
+  
+  .session-buttons button:hover {
+    background: #2563eb;
+  }
+  
+  /* ========================= */
+  /* CHAT WINDOW */
+  /* ========================= */
+  
+  .chat-window {
+    min-height: 280px;
+    margin: 18px 0;
+    background: #020617;
+    border-radius: 14px;
+    padding: 18px;
+    overflow-y: auto;
+    border: 1px solid #1e293b;
+  }
+  
+  .placeholder {
+    color: #64748b;
+  }
+  
+  .analysis-error {
+    color: #f87171;
+    margin-top: 8px;
+  }
+  
+  .messages {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  
+  .msg {
+    max-width: 90%;
+    padding: 10px 14px;
+    border-radius: 12px;
+  }
+  
+  .msg-assistant {
+    align-self: flex-start;
+    background: #1e293b;
+    border: 1px solid #334155;
+  }
+  
+  .msg-user {
+    align-self: flex-end;
+    background: #1d4ed8;
+    color: white;
+  }
+  
+  .msg-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    color: #93c5fd;
+  }
+  
+  .msg-user .msg-label {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  
+  .msg-content {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .msg-content.typing {
+    color: #94a3b8;
+    font-style: italic;
+  }
+  
+  .answer-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .answer-area textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #1e293b;
+    background: #0f172a;
+    color: white;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+  }
+  
+  .send-btn {
+    align-self: flex-end;
+    padding: 8px 20px;
+    background: #1d4ed8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  .send-btn:hover:not(:disabled) {
+    background: #2563eb;
+  }
+  
+  .send-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .session-ended-block {
+    margin-top: 12px;
+  }
+  
+  .overall-score {
+    color: #93c5fd;
+    font-size: 16px;
+    margin: 0 0 8px 0;
+  }
+  
+  .overall-score strong {
+    color: #60a5fa;
+  }
+  
+  .overall-feedback {
+    margin: 12px 0;
+    padding: 12px;
+    background: #0f172a;
+    border-radius: 10px;
+    border: 1px solid #1e293b;
+  }
+  
+  .overall-feedback-label {
+    font-size: 12px;
+    color: #93c5fd;
+    margin: 0 0 6px 0;
+    font-weight: 600;
+  }
+  
+  .overall-feedback-text {
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  
+  .session-ended {
+    color: #64748b;
+    font-size: 14px;
+    margin: 0;
+  }
+  
+  .analyze-btn {
+    background: #1d4ed8 !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px;
+    font-weight: 600;
+  }
+  
+  .analyze-btn:hover:not(:disabled) {
+    background: #2563eb !important;
+  }
+  
+  .analyze-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* ========================= */
+  /* CONTROLS */
+  /* ========================= */
+  
+  .controls {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    min-height: 100px;
+    margin-bottom: 20px;
+  }
+  
+  /* Control Cards */
+  
+  .file-card,
+  .job-card {
+    background: #020617;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 170px;
+    transition: 0.2s;
+  }
+  
+  .job-card-wide {
+    flex: 1;
+    min-width: 260px;
+  }
+  
+  .job-card textarea {
+    padding: 7px;
+    border-radius: 6px;
+    border: 1px solid #1e293b;
+    background: #0f172a;
+    color: white;
+    resize: vertical;
+    font-family: inherit;
+  }
+  
+  .file-card:hover,
+  .job-card:hover {
+    border-color: #3b82f6;
+  }
+  
+  /* Inputs */
+  
+  .file-card input,
+  .job-card input {
+    padding: 7px;
+    border-radius: 6px;
+    border: 1px solid #1e293b;
+    background: #0f172a;
+    color: white;
+  }
+  
+  .file-name {
+    font-size: 12px;
+    color: #93c5fd;
+  }
+  
+  /* ========================= */
+  /* SUMMARY */
+  /* ========================= */
+  
+  .summary textarea {
+    width: 100%;
+    height: 85px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+    padding: 12px;
+    border: 1px solid #1e293b;
+    background: #020617;
+    color: white;
+    resize: vertical;
+  }
+  
+  .summary h3 {
+    color: #93c5fd;
+    margin-bottom: 6px;
+  }
+  
+  .summary-hint {
+    font-size: 12px;
+    color: #64748b;
+    margin: -2px 0 6px 0;
+  }  
