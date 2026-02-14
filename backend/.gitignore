@@ -31,3 +31,7 @@ build/
 
 # VSCode settings (optional)
 .vscode/
+
+
+node_modules
+.env
