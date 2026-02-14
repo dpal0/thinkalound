@@ -21,6 +21,7 @@ export default function AIInterviewer() {
     jobTitle: string
     jobDescription: string
   } | null>(null)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
   const [answer, setAnswer] = useState('')
   const [sending, setSending] = useState(false)
   const [interviewDone, setInterviewDone] = useState(false)
@@ -70,7 +71,16 @@ export default function AIInterviewer() {
         jobTitle,
         jobDescription,
       })
-      setMessages([{ role: 'assistant', content: data.firstQuestion }])
+      const first = { role: 'assistant' as const, content: data.firstQuestion }
+      setMessages([first])
+      // Play the first question if voice is enabled
+      if (voiceEnabled) {
+        try {
+          await playTTS(first.content)
+        } catch {
+          // ignore TTS errors silently
+        }
+      }
     } catch (e) {
       setAnalysisError(e instanceof Error ? e.message : 'Analysis failed')
     } finally {
@@ -106,15 +116,46 @@ export default function AIInterviewer() {
           setOverallFeedback(data.overallFeedback)
           setSessionSummary(data.overallFeedback)
         }
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.closingMessage }])
+        const closing = { role: 'assistant' as const, content: data.closingMessage }
+        setMessages((prev) => [...prev, closing])
+        if (voiceEnabled) {
+          try { await playTTS(closing.content) } catch {}
+        }
         setInterviewDone(true)
       } else if (data.nextQuestion) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.nextQuestion }])
+        const next = { role: 'assistant' as const, content: data.nextQuestion }
+        setMessages((prev) => [...prev, next])
+        if (voiceEnabled) {
+          try { await playTTS(next.content) } catch {}
+        }
       }
     } catch (e) {
       setAnalysisError(e instanceof Error ? e.message : 'Failed to get next question')
     } finally {
       setSending(false)
+    }
+  }
+
+  // Play text via backend TTS proxy. Sends POST /api/tts and plays returned audio/mpeg.
+  async function playTTS(text: string) {
+    if (!text) return
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) throw new Error('TTS request failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.autoplay = true
+      // attempt to play and revoke url after playback
+      await audio.play().catch(() => {})
+      // revoke after a short delay to give the browser time to fetch
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (e) {
+      throw e
     }
   }
 
@@ -221,6 +262,19 @@ export default function AIInterviewer() {
               }}
             />
             <span className="file-name">{fileName || 'No file chosen'}</span>
+          </div>
+
+          <div className="file-card">
+            <label>Voice</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                id="voice-toggle"
+                type="checkbox"
+                checked={voiceEnabled}
+                onChange={(e) => setVoiceEnabled(e.target.checked)}
+              />
+              <label htmlFor="voice-toggle" style={{ fontSize: 13 }}>Enable voice</label>
+            </div>
           </div>
 
           <div className="job-card">

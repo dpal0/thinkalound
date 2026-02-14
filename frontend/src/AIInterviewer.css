@@ -265,6 +265,12 @@
     font-size: 12px;
     color: #93c5fd;
   }
+
+  /* Voice toggle */
+  .file-card input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+  }
   
   /* ========================= */
   /* SUMMARY */
