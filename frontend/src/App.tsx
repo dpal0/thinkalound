@@ -11,15 +11,6 @@ const experts = [
 
 function App() {
   const [selectedExpert, setSelectedExpert] = useState(experts[0])
-  const [voiceMode, setVoiceMode] = useState(false)
-
-  // Limits will come from agent question later
-  const [limitType, setLimitType] = useState<'word' | 'time' | 'none'>('word')
-  const [limitValue, setLimitValue] = useState(200)
-
-  const [sessionSummary, setSessionSummary] = useState('')
-  const [feedback, setFeedback] = useState('')
-  const [fileName, setFileName] = useState('')
 
   return (
     <div className="app">
