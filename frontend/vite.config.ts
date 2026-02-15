@@ -9,6 +9,8 @@ export default defineConfig({
       '/api': { target: 'http://localhost:3001', changeOrigin: true },
       // CodeQuestionBot routes — proxied through server.js which reverse-proxies to Flask
       '/cqbot': { target: 'http://localhost:3001', changeOrigin: true },
+      // WebSocket STT proxy
+      '/ws/stt': { target: 'ws://localhost:3001', ws: true },
     },
   },
 })
