@@ -31,7 +31,7 @@ export default function AIInterviewer() {
   const [savedSessions, setSavedSessions] = useState<any[]>([])
 const [selectedSessionId, setSelectedSessionId] = useState('')
 const [analytics, setAnalytics] = useState<any>(null)
-const [loadingAnalytics, setLoadingAnalytics] = useState(false)
+const [, setLoadingAnalytics] = useState(false)
 
   // ── STT (Speech-to-Text) state ──
   const [isRecording, setIsRecording] = useState(false)
@@ -577,11 +577,13 @@ const [loadingAnalytics, setLoadingAnalytics] = useState(false)
 
       {analytics.aiAnalysis && !analytics.aiAnalysis.error && (
         <div className="ai-insights">
-          <h4>AI Insights from Gemini</h4>
+          <h4>Overall Candidate Insights</h4>
           <p><strong>Fit score:</strong> {analytics.aiAnalysis.fitScore}/100</p>
           <p><strong>Reason:</strong> {analytics.aiAnalysis.fitReason}</p>
           <p><strong>First interview question suggested:</strong> {analytics.aiAnalysis.firstQuestion}</p>
           <p><strong>Resume summary:</strong> {analytics.aiAnalysis.resumeSummary}</p>
+          <p><strong>Themes:</strong> {analytics.aiAnalysis.themes}</p>
+          <p><strong>Sentiment Summary:</strong> {analytics.aiAnalysis.sentimentSummary}</p>
         </div>
       )}
 

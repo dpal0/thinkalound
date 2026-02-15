@@ -514,6 +514,10 @@ app.post('/api/session/save', async (req, res) => {
         Respond **ONLY in strict JSON** with the keys:
 
         {
+        "fitScore": "overall candidate fit score out of a 100",
+        "fitReason": "reasoning for the fit score",
+        "firstQuestion": "the first interview question asked",
+        "resumeSummary": "summary of the candidate's resume",
         "themes": ["short list of themes you detect across sessions"],
         "sentimentSummary": "short summary of overall sentiment, positive/neutral/negative"
         }
@@ -526,16 +530,17 @@ app.post('/api/session/save', async (req, res) => {
         const aiText = result.response?.text?.() || ''
         let aiAnalysis = {}
         try {
-        const cleaned = aiText
-            .replace(/^```json\s*/i, '')
-            .replace(/^```/i, '')
-            .trim()
-        aiAnalysis = JSON.parse(cleaned)
+        // Extract JSON object from the string
+        const match = aiText.match(/\{[\s\S]*\}/) // matches the first {...} block
+        if (match) {
+            aiAnalysis = JSON.parse(match[0])
+        } else {
+            aiAnalysis = { error: 'No JSON found in AI output' }
+        }
         } catch (err) {
         console.error('Failed to parse AI output:', aiText, err)
         aiAnalysis = { error: 'Failed to parse AI analysis' }
         }
-  
         res.json({ ...analytics, aiAnalysis })
       } else {
         res.json(analytics)
