@@ -1,5 +1,5 @@
 // AIInterviewer.tsx
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import './AIInterviewer.css'
 
 export default function AIInterviewer() {
@@ -27,6 +27,9 @@ export default function AIInterviewer() {
   const [interviewDone, setInterviewDone] = useState(false)
   const [overallScore, setOverallScore] = useState<number | null>(null)
   const [overallFeedback, setOverallFeedback] = useState<string>('')
+
+  const [savedSessions, setSavedSessions] = useState<any[]>([])
+const [selectedSessionId, setSelectedSessionId] = useState('')
 
   // ── STT (Speech-to-Text) state ──
   const [isRecording, setIsRecording] = useState(false)
@@ -203,6 +206,7 @@ export default function AIInterviewer() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+            sessionId: selectedSessionId,
           resumeSummary: sessionContext.resumeSummary,
           jobTitle: sessionContext.jobTitle,
           jobDescription: sessionContext.jobDescription,
@@ -222,6 +226,23 @@ export default function AIInterviewer() {
         if (voiceEnabled) {
           try { await playTTS(closing.content) } catch {}
         }
+
+        try {
+            await fetch('/api/session/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jobTitle: sessionContext.jobTitle,
+                feedback: data.overallFeedback,
+                messages: nextMessages,
+                score: data.overallScore,
+                resume_summary: sessionContext.resumeSummary,
+              }),
+            })
+          } catch (err) {
+            console.error('Failed to save session', err)
+          }
+
         setInterviewDone(true)
       } else if (data.nextQuestion) {
         const next = { role: 'assistant' as const, content: data.nextQuestion }
@@ -236,6 +257,62 @@ export default function AIInterviewer() {
       setSending(false)
     }
   }
+
+  async function loadSessions() {
+    try {
+      const res = await fetch('/api/session/list')
+      const data = await res.json()
+      setSavedSessions(data || [])
+    } catch (e) {
+      console.error('Failed to load sessions')
+    }
+  }
+  
+  async function handleResumeSession() {
+    const session = savedSessions.find(s => s._id === selectedSessionId)
+    if (!session) return
+  
+    console.log('Resuming session:', session) // debug
+  
+    const messages = session.messages || []
+  
+    setSessionContext({
+      resumeSummary: session.resume_summary,
+      jobTitle: session.jobTitle,
+      jobDescription: session.jobDescription || '',
+    })
+    setMessages(messages)
+    setSessionSummary(session.feedback || '')
+    setOverallScore(session.score ?? null)
+    setOverallFeedback(session.feedback || '')
+  
+    // Determine if the interview is done:
+    // If last message is from assistant and session has overall score, assume done
+    const lastMessage = messages[messages.length - 1]
+    const isDone = session.score != null && lastMessage?.role === 'assistant'
+    setInterviewDone(isDone)
+  
+    // If interview is not done, prefill answer with last user input if any
+    if (!isDone) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user')
+      if (lastUser) {
+        setAnswer(lastUser.content)
+      }
+    }
+  
+    // Play last assistant message if TTS is enabled
+    if (voiceEnabled && messages.length > 0) {
+      const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+      if (lastAssistant) {
+        try {
+          await playTTS(lastAssistant.content)
+        } catch (err) {
+          console.error('Failed to play TTS for resumed session:', err)
+        }
+      }
+    }
+  }
+  
 
   // Play text via backend TTS proxy. Sends POST /api/tts and plays returned audio/mpeg.
   async function playTTS(text: string) {
@@ -260,6 +337,10 @@ export default function AIInterviewer() {
     }
   }
 
+  useEffect(() => {
+    loadSessions()
+  }, [])
+  
   return (
     <section className="chat">
       <div className="chat-inner">
@@ -351,6 +432,28 @@ export default function AIInterviewer() {
           {analysisError && <p className="analysis-error">{analysisError}</p>}
         </div>
 
+        <div className="file-card resume-card">
+        <label>Reload Previous Session Summary</label>
+        <select
+            value={selectedSessionId}
+            onChange={(e) => setSelectedSessionId(e.target.value)}
+        >
+            <option value="">Select a session…</option>
+            {savedSessions.map((s) => (
+            <option key={s._id} value={s._id}>
+                {s.jobTitle} – {new Date(s.createdAt).toLocaleDateString()}
+            </option>
+            ))}
+        </select>
+
+        <button
+            className="resume-btn"
+            onClick={handleResumeSession}
+        >
+            Reload Summary
+        </button>
+        </div>
+                <br></br>
         <div className="controls">
           <button
             type="button"

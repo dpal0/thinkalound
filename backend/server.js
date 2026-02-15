@@ -9,6 +9,8 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { pipeline } from 'stream'
 import { promisify } from 'util'
 
+import { saveSession, getSessions } from './mongo.js'
+
 const streamPipeline = promisify(pipeline)
 
 const app = express()
@@ -463,6 +465,41 @@ wss.on('connection', (clientWs) => {
   clientWs.on('close', () => elWs.close())
   elWs.on('close', () => clientWs.close())
 })
+
+app.post('/api/session/save', async (req, res) => {
+    try {
+      const session = {
+        jobTitle: req.body.jobTitle,
+        jobDescription: req.body.jobDescription || '', // save job description
+        feedback: req.body.feedback || '',
+        messages: req.body.messages || [],
+        score: req.body.score ?? null,
+        resume_summary: req.body.resume_summary || '',
+        createdAt: new Date(),
+      }
+      console.log('Saving session:', session)
+      await saveSession(session)
+      res.json({ ok: true })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+  
+
+  app.get('/api/session/list', async (req, res) => {
+    try {
+      const sessions = await getSessions()
+      // Convert _id to string for frontend
+      const sessionsWithStringId = sessions.map(s => ({
+        ...s,
+        _id: s._id.toString()
+      }))
+      res.json(sessionsWithStringId)
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+  
 
 server.listen(PORT, () => {
   // Server started

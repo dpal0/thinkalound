@@ -357,3 +357,33 @@
     color: #64748b;
     margin: -2px 0 6px 0;
   }  
+
+/* Resume Session Card */
+.resume-card select {
+    padding: 7px;
+    border-radius: 6px;
+    border: 1px solid #1e293b;
+    background: #0f172a;
+    color: white;
+  }
+  
+  .resume-btn {
+    margin-top: 6px;
+    padding: 7px;
+    background: #334155;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  
+  .resume-btn:hover:not(:disabled) {
+    background: #3b82f6;
+  }
+  
+  .resume-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
