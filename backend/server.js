@@ -551,6 +551,9 @@ app.post('/api/session/save', async (req, res) => {
     }
   })
 
-server.listen(PORT, () => {
-  // Server started
-})
+// server.listen(PORT, () => {
+//   // Server started
+// })
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
