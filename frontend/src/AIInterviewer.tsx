@@ -1,5 +1,5 @@
 // AIInterviewer.tsx
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import './AIInterviewer.css'
 
 export default function AIInterviewer() {
@@ -27,6 +27,107 @@ export default function AIInterviewer() {
   const [interviewDone, setInterviewDone] = useState(false)
   const [overallScore, setOverallScore] = useState<number | null>(null)
   const [overallFeedback, setOverallFeedback] = useState<string>('')
+
+  // ── STT (Speech-to-Text) state ──
+  const [isRecording, setIsRecording] = useState(false)
+  const [sttPartial, setSttPartial] = useState('')
+  const wsRef = useRef<WebSocket | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const processorRef = useRef<ScriptProcessorNode | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      const ws = new WebSocket(`${protocol}://${window.location.host}/ws/stt`)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        // Start capturing audio
+        const audioCtx = new AudioContext({ sampleRate: 16000 })
+        audioCtxRef.current = audioCtx
+        const source = audioCtx.createMediaStreamSource(stream)
+        const processor = audioCtx.createScriptProcessor(4096, 1, 1)
+        processorRef.current = processor
+
+        processor.onaudioprocess = (e) => {
+          if (ws.readyState !== WebSocket.OPEN) return
+          const float32 = e.inputBuffer.getChannelData(0)
+          // Convert Float32 → Int16 PCM
+          const int16 = new Int16Array(float32.length)
+          for (let i = 0; i < float32.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32[i]))
+            int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+          }
+          ws.send(int16.buffer)
+        }
+
+        source.connect(processor)
+        processor.connect(audioCtx.destination)
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          if (payload.message_type === 'partial_transcript' && payload.text) {
+            setSttPartial(payload.text)
+          } else if (
+            payload.message_type === 'committed_transcript' &&
+            payload.text
+          ) {
+            // Append committed text to the answer
+            setAnswer((prev) => {
+              const sep = prev && !prev.endsWith(' ') ? ' ' : ''
+              return prev + sep + payload.text
+            })
+            setSttPartial('')
+          } else if (payload.message_type?.includes('error') || payload.message_type === 'server_error') {
+            setAnalysisError(payload.detail || payload.error || 'STT error')
+          }
+        } catch {}
+      }
+
+      ws.onerror = () => {
+        setAnalysisError('Speech-to-text connection failed')
+        stopRecording()
+      }
+
+      ws.onclose = () => {
+        // Cleanup handled in stopRecording
+      }
+
+      setIsRecording(true)
+      setSttPartial('')
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error ? err.message : 'Microphone access denied'
+      )
+    }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop())
+      mediaStreamRef.current = null
+    }
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    setIsRecording(false)
+    setSttPartial('')
+  }, [])
 
   async function handleAnalyze() {
     if (!resumeFile || !jobTitle.trim()) {
@@ -191,9 +292,9 @@ export default function AIInterviewer() {
               {!interviewDone && (
                 <div className="answer-area">
                   <textarea
-                    placeholder="Type your answer…"
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Type your answer or click the mic to speak…"
+                    value={answer + (sttPartial ? (answer ? ' ' : '') + sttPartial : '')}
+                    onChange={(e) => { setAnswer(e.target.value); setSttPartial('') }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
@@ -203,14 +304,28 @@ export default function AIInterviewer() {
                     rows={2}
                     disabled={sending}
                   />
-                  <button
-                    type="button"
-                    className="send-btn"
-                    onClick={handleSendAnswer}
-                    disabled={sending || !answer.trim()}
-                  >
-                    {sending ? 'Sending…' : 'Send'}
-                  </button>
+                  {sttPartial && (
+                    <p className="stt-partial">Hearing: <em>{sttPartial}</em></p>
+                  )}
+                  <div className="answer-actions">
+                    <button
+                      type="button"
+                      className={`mic-btn ${isRecording ? 'mic-recording' : ''}`}
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={sending || interviewDone}
+                      title={isRecording ? 'Stop recording' : 'Start speaking'}
+                    >
+                      {isRecording ? '⏹ Stop' : '🎤 Speak'}
+                    </button>
+                    <button
+                      type="button"
+                      className="send-btn"
+                      onClick={handleSendAnswer}
+                      disabled={sending || !answer.trim()}
+                    >
+                      {sending ? 'Sending…' : 'Send'}
+                    </button>
+                  </div>
                 </div>
               )}
               {interviewDone && (
